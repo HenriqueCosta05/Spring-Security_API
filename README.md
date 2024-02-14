@@ -12,6 +12,16 @@ JWTs tornaram-se um método popular de proteger aplicações web modernas. Basic
 transmitir informações de forma segura entre partes através de um objeto JSON compacto, independente e 
 assinado digitalmente.
 
+#### Estrutura de um JWT
+* Header: corresponde ao cabeçalho da requisição.
+* Payload: consiste nos dados encriptografados e armazenados no JWT, em formato de JSON.
+* Signature (opcional): utilizamos essa seção para verificar autorizações.
+
+
+Cada seção do JWT é representada por strings criptografadas em formato base64url, sendo delimitada por um 
+ponto ('.'). Comumente, o JWT contém `Claims`, cujos representam dados sobre o usuário, que a API pode usar 
+para conceder permissões ou não para o usuário que fornece o token.
+
 ## Passo a passo
 
 ### Passo 0: Configurar o banco de dados em `application.yml`
@@ -219,16 +229,56 @@ public class UserDetailsServiceImpl implements UserDetailsService {
 }
 ````
 
---- Em breve ---
 ### Passo 4: Criar a classe de serviço JWT
+ 
+#### 4.1.1. Gerar o token por meio de funções nativas do Java
+Para criar uma autenticação via token, muito chamada também de `Bearer Authentication`, devemos 
+seguir alguns procedimentos para que o token seja gerado com sucesso: 
 
-#### 4.1. Extrair o payload (Claim) do token
+#### 4.2.1. Extrair o payload (Claim) do token por meio de funções nativas do Java
+Podemos descriptografar o token por meio de funções nativas do Java.
 
-#### 4.2. Extrair a informação desejada pelo payload
+Primeiramente, separaremos o token em suas diferentes seções.
+```java
+String[] jWTSections = token.split("\\.");
+```
+Agora, nosso array jWTSections deve ter dois ou três elementos correspondentes às seções JWT. O próximo passo é 
+usar recursos provenientes do java para descriptografar cada seção do JWT:
+````java
+Base64.Decoder decoder = Base64.getUrlDecoder();
 
-#### 4.3. Validar o token
+String header = new String(decoder.decode(jWTSections[0]));
+String payload = new String(decoder.decode(jWTSections[1])); // Extraímos o payload por meio desta linha.
+````
+#### 4.2.2. Extrair o payload (Claim) do token através da dependência JJWT.
+Pode-se, também, utilizar métodos e objetos provenientes do JJWT, como empreguei na minha API:
+````java
+private Claims extractAllClaims(String token) {
+    return Jwts
+            .parser()
+            .verifyWith(getSigninKey())
+            .build()
+            .parseSignedClaims(token)
+            .getPayload();
+}
+````
+Esse método recebe um token como entrada e retorna todas as reivindicações (claims) contidas
+nesse token. Basicamente, é composto por cinco métodos que realizam em conjunto tal tarefa:
+* `Jwts.parser()`: este método estático é usado para **obter um objeto JwtParser**, responsável
+por analisar e validar tokens JWT.
 
-#### 4.4. Verificar se o token está expirado
+* `.verifyWith(getSigninKey())`: o método verifyWith é usado para configurar a chave de verificação
+utilizada para validar a assinatura do token. O parâmetro que esse método recebe é o `getSigninKey()`,
+cujo retorna a chave de verificação apropriada para a aplicação.
+* `.build()`: esse método é usado para **analisar o token JWT** e criar um objeto `JwtParser`.
+* `.parseSignedClaims(token)`: analisa o token fornecido como entrada e verifica sua assinatura, retornando
+um objeto `Jwts<Claims`, que contém os claims do token.
+* `.getPayload()`: utilizado para obter apenas as reivindicações do token, isto é, apenas o payload.
+#### 4.3. Extrair a informação desejada pelo payload
+
+#### 4.4. Validar o token
+
+#### 4.5. Verificar se o token está expirado
 
 
 ### Passo 5: Criar o JWT Filter
